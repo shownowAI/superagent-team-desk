@@ -51,6 +51,9 @@
     #pending small { color: var(--muted); font-size: 12px; display: block; line-height: 1.8; margin-top: 4px; }
     .empty { color: var(--blue); font-size: 16px; line-height: 1.8; padding: 24px 0; }
     .note { color: var(--muted); font-size: 12px; line-height: 1.8; margin: 18px 0 0; }
+    #brief-btn { background: var(--blue); color: white; border: 0; padding: 10px 18px; font-size: 14px; margin-top: 18px; }
+    #brief { background: white; border: 1px solid #D6D4CA; margin: 14px 0 0; padding: 14px 16px; font: inherit; font-size: 14px; line-height: 1.9; color: var(--ink); white-space: pre-wrap; word-break: break-word; user-select: text; }
+    #brief[hidden] { display: none; }
     .bottom { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-top: 24px; }
     #reset { border: 1px solid var(--blue); background: transparent; color: var(--blue); padding: 10px 18px; font-size: 14px; white-space: nowrap; }
     footer { color: var(--muted); font-size: 12px; line-height: 1.9; }
@@ -76,12 +79,14 @@
         <div class="followup-head"><h2>还要跟进</h2><span id="pending-count" aria-live="polite"></span></div>
         <ul id="pending"></ul>
         <p class="note">这里应该只列出尚未完成的事项，方便下一次团队讨论。</p>
+        <button id="brief-btn" type="button">生成跟进简报</button>
+        <pre id="brief" aria-live="polite" hidden></pre>
       </aside>
     </main>
     <div class="bottom"><button id="reset" type="button">重新演示</button><footer>公开教学 Demo：团队、事项与截止时间均为虚构。<br>初始版本故意保留一处状态切换错误，供 SuperAgent 复现和修复；刷新后重置。</footer></div>
   </div>
   <script type="module">
-    import { toggleTask } from './tasks.mjs';
+    import { toggleTask, buildFollowupBrief } from './tasks.mjs';
 
     const initialTasks = [
       { id: 1, title: '演示脚本定稿', detail: '确认演示顺序和讲解内容', owner: '产品同学', deadline: '周四 18:00', completed: false },
@@ -92,6 +97,8 @@
     const taskList = document.querySelector('#tasks');
     const pendingList = document.querySelector('#pending');
     const activity = document.querySelector('#activity');
+    const briefOutput = document.querySelector('#brief');
+    const briefBtn = document.querySelector('#brief-btn');
 
     function render() {
       const pending = tasks.filter(task => !task.completed);
@@ -99,6 +106,9 @@
       document.querySelector('#pending-count').textContent = `${pending.length} 项`;
       taskList.innerHTML = tasks.map((task,index) => `<li class="task-row${task.completed ? ' done' : ''}"><div class="task-name"><span class="task-number">${task.completed ? '✓' : String(index + 1).padStart(2,'0')}</span><div><strong>${task.title}</strong><small>${task.detail}</small></div></div><span class="owner">${task.owner}</span><span class="deadline">${task.deadline}<small>${task.completed ? '已完成' : '待跟进'}</small></span><button type="button" class="complete" data-id="${task.id}" aria-label="${task.completed ? '撤销' : '完成'}${task.title}">${task.completed ? '撤销' : '完成'}</button></li>`).join('');
       pendingList.innerHTML = pending.length ? pending.map(task => `<li><strong>${task.title}</strong><small>${task.owner} · ${task.deadline}</small></li>`).join('') : '<li class="empty">目前没有待跟进事项。</li>';
+      // 任务状态变化后，已展示的简报即为旧快照，清空以免误导。
+      briefOutput.textContent = '';
+      briefOutput.hidden = true;
     }
 
     taskList.addEventListener('click', event => {
@@ -110,6 +120,11 @@
       tasks = toggleTask(tasks,id);
       render();
       activity.textContent = `刚刚${wasCompleted ? '撤销' : '完成'}了“${selected.title}”；现在共有 ${tasks.filter(task => task.completed).length} 项已完成。`;
+    });
+
+    briefBtn.addEventListener('click', () => {
+      briefOutput.textContent = buildFollowupBrief(tasks);
+      briefOutput.hidden = false;
     });
 
     document.querySelector('#reset').addEventListener('click', () => {
